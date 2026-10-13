@@ -563,12 +563,79 @@ $('dice').onclick = doShuffle;
 
 $('go').onclick = function(){
   if(!cur){ doShuffle(); return; }
-  var id = cur.i;
-  window.location.href = 'orpheus://song/' + id;
-  setTimeout(function(){
-    window.open('https://y.music.163.com/m/song?id=' + id, '_blank');
-  }, 500);
+  openInApp(cur.i);
 };
+
+/* 唤起网易云 App 播放指定歌曲。
+   只用自定义 scheme, 不做网页兜底 —— 网页中间页会让用户多点一次,
+   而且 App 成功唤起时网页也会被打开, 体验很差。
+   唤起失败(iOS 上没有安装, 或 scheme 被拦截)再给一次手动选项。 */
+function openInApp(songId){
+  var scheme = 'orpheus://song/' + songId;
+  var t0 = Date.now();
+
+  // 通过隐藏 iframe 触发 scheme: 比直接跳转更温和,
+  // 不会把当前页导航走, 页面状态得以保留
+  var ifr = document.createElement('iframe');
+  ifr.style.cssText = 'display:none;width:0;height:0;border:0';
+  ifr.src = scheme;
+  document.body.appendChild(ifr);
+  setTimeout(function(){ try{ ifr.remove(); }catch(e){} }, 1200);
+
+  // 记录页面是否被切到后台: 被切说明 App 唤起成功
+  var wentBackground = false;
+  function onHide(){ if(document.hidden) wentBackground = true; }
+  document.addEventListener('visibilitychange', onHide);
+  window.addEventListener('pagehide', function(){ wentBackground = true; });
+
+  setTimeout(function(){
+    document.removeEventListener('visibilitychange', onHide);
+    // 页面还可见 => 大概率没唤起成功, 给个明确的手动入口
+    if(!wentBackground && !document.hidden){
+      showOpenFallback(songId);
+    }
+  }, 1100);
+}
+
+var _fbTimer = null;
+function showOpenFallback(songId){
+  var old = document.getElementById('openfb');
+  if(old) old.remove();
+
+  var box = document.createElement('div');
+  box.id = 'openfb';
+  box.innerHTML =
+    '<span>没跳转？</span>' +
+    '<a class="fb-a" href="orpheus://song/' + songId + '">重试</a>' +
+    '<a class="fb-b" href="https://y.music.163.com/m/song?id=' + songId +
+      '" target="_blank" rel="noopener">网页版</a>' +
+    '<button class="fb-x" aria-label="关闭">✕</button>';
+  document.documentElement.appendChild(box);
+
+  var st = document.createElement('style');
+  st.textContent =
+    '#openfb{position:fixed;left:14px;right:14px;' +
+      'bottom:calc(14px + env(safe-area-inset-bottom));z-index:130;' +
+      'display:flex;align-items:center;gap:8px;' +
+      'background:rgba(28,28,36,.97);border:1px solid rgba(255,255,255,.14);' +
+      'border-radius:14px;padding:9px 10px 9px 14px;' +
+      '-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);' +
+      'box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:13px;color:#fff}' +
+    '#openfb>span{flex:1;min-width:0;color:#8e93a8;font-size:12.5px}' +
+    '#openfb .fb-a,#openfb .fb-b{flex:none;text-align:center;text-decoration:none;' +
+      'border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;color:#fff}' +
+    '#openfb .fb-a{background:linear-gradient(135deg,#ff3b3b,#c20c0c)}' +
+    '#openfb .fb-b{background:rgba(255,255,255,.1);' +
+      'border:1px solid rgba(255,255,255,.14)}' +
+    '#openfb .fb-x{width:26px;height:26px;flex:none;border-radius:8px;' +
+      'background:rgba(255,255,255,.07);color:#8e93a8;font-size:11px}';
+  document.head.appendChild(st);
+
+  box.querySelector('.fb-x').onclick = function(){ box.remove(); };
+  // 12 秒后自动消失, 不长期占位
+  clearTimeout(_fbTimer);
+  _fbTimer = setTimeout(function(){ try{ box.remove(); }catch(e){} }, 12000);
+}
 
 $('copy').onclick = function(){
   if(!cur){ toast('先抽一首'); return; }
