@@ -338,9 +338,15 @@ function sfxPop(){
 function buildFilters(){
   var cnt = {};
   SONGS.forEach(function(s){
-    var main = (s.a || '').split('/')[0].trim();
-    if(!main) return;
-    cnt[main] = (cnt[main] || 0) + 1;
+    // 与 matchFilter 保持同一口径: 合作曲的每个歌手都算
+    var arts = (s.a || '').split('/');
+    var seen = {};
+    arts.forEach(function(a){
+      a = a.trim();
+      if(!a || seen[a]) return;
+      seen[a] = 1;
+      cnt[a] = (cnt[a] || 0) + 1;
+    });
   });
   var list = Object.keys(cnt).map(function(k){ return [k, cnt[k]]; })
     .sort(function(a,b){ return b[1]-a[1]; });
@@ -365,6 +371,12 @@ function buildFilters(){
       cur = null;
       var n = curFilter ? SONGS.filter(matchFilter).length : SONGS.length;
       $('badge').textContent = n + ' 首';
+      // 同步"不重复"底色
+      var av = $('avoid');
+      if(av.classList.contains('on')){
+        var k2 = getComputedStyle(document.documentElement).getPropertyValue('--k2').trim() || '#4b1a6e';
+        av.style.background = rgba(k2, 0.38);
+      }
       toast(curFilter ? ('只看 ' + curFilter + ' · ' + n + ' 首') : ('全部 ' + n + ' 首'));
     };
   });
@@ -556,7 +568,15 @@ $('clear').onclick = function(){
 
 $('avoid').onclick = function(){
   this.classList.toggle('on');
-  toast(this.classList.contains('on') ? '不重复已开' : '不重复已关');
+  var on = this.classList.contains('on');
+  // 内联色需要同步更新
+  if(on){
+    var k2 = getComputedStyle(document.documentElement).getPropertyValue('--k2').trim() || '#4b1a6e';
+    this.style.background = rgba(k2, 0.38);
+  } else {
+    this.style.background = '';
+  }
+  toast(on ? '不重复已开' : '不重复已关');
 };
 
 document.addEventListener('keydown', function(e){
