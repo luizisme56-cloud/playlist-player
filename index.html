@@ -3,16 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0a0a0f">
 <title>随机播放 · 等1000人觉得很赞</title>
+
+<!-- PWA / 主屏幕 App -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="description" content="从《等1000人觉得很赞喜欢的音乐》2329 首里随机抽一首">
+
+<!-- iOS 添加到主屏幕 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="随机播放">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon-120.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:#0a0a0f;color:#fff;
   font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
   overscroll-behavior:none;-webkit-font-smoothing:antialiased}
 body{min-height:100vh;display:flex;flex-direction:column;
-  padding:calc(14px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+  padding:calc(16px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
   position:relative;overflow-x:hidden}
 
 /* === 动态背景: 跟随封面主色 === */
@@ -586,6 +599,68 @@ document.addEventListener('keydown', function(e){
 /* ============ 初始化 ============ */
 buildFilters();
 renderHist();
+
+// 注册 Service Worker (提升主屏 App 的启动体验)
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+
+/* ============ 添加到主屏引导 ============ */
+(function(){
+  var standalone = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if(standalone) return;                        // 已经是 App 模式, 不打扰
+
+  // 只对 iOS Safari 显示
+  var ua = navigator.userAgent;
+  var isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  if(!isIOS || !isSafari) return;
+
+  try{
+    if(localStorage.getItem('a2hs_dismissed') === '1') return;
+  }catch(e){}
+
+  var bar = document.createElement('div');
+  bar.id = 'a2hs';
+  bar.innerHTML =
+    '<div class="a2hs-txt">' +
+      '<b>加到主屏幕</b>' +
+      '<span>点下方 <i>⎋</i> 分享 → 「添加到主屏幕」，秒变 App</span>' +
+    '</div>' +
+    '<button class="a2hs-x" aria-label="关闭">✕</button>';
+  document.body.appendChild(bar);
+
+  var st = document.createElement('style');
+  st.textContent =
+    '#a2hs{position:fixed;left:12px;right:12px;' +
+      'bottom:calc(12px + env(safe-area-inset-bottom));z-index:120;' +
+      'display:flex;align-items:center;gap:10px;' +
+      'background:rgba(28,28,36,.97);border:1px solid rgba(255,255,255,.14);' +
+      'border-radius:15px;padding:13px 14px;backdrop-filter:blur(14px);' +
+      'box-shadow:0 12px 34px rgba(0,0,0,.5);' +
+      'transform:translateY(140%);transition:transform .45s cubic-bezier(.2,1,.3,1)}' +
+    '#a2hs.on{transform:translateY(0)}' +
+    '#a2hs .a2hs-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}' +
+    '#a2hs b{font-size:13.5px;font-weight:650;color:#fff}' +
+    '#a2hs span{font-size:11.5px;color:#8e93a8;line-height:1.45}' +
+    '#a2hs i{font-style:normal;display:inline-block;color:#ff3b3b;font-size:13px}' +
+    '#a2hs .a2hs-x{width:30px;height:30px;flex:none;border-radius:9px;' +
+      'background:rgba(255,255,255,.09);color:#8e93a8;font-size:13px}' +
+    '#a2hs .a2hs-x:active{background:rgba(255,255,255,.18)}';
+  document.head.appendChild(st);
+
+  setTimeout(function(){ bar.classList.add('on'); }, 900);
+
+  bar.querySelector('.a2hs-x').onclick = function(){
+    bar.classList.remove('on');
+    try{ localStorage.setItem('a2hs_dismissed', '1'); }catch(e){}
+    setTimeout(function(){ bar.remove(); }, 500);
+  };
+})();
 </script>
 </body>
 </html>
