@@ -567,34 +567,29 @@ $('go').onclick = function(){
 };
 
 /* 唤起网易云 App 播放指定歌曲。
-   只用自定义 scheme, 不做网页兜底 —— 网页中间页会让用户多点一次,
-   而且 App 成功唤起时网页也会被打开, 体验很差。
-   唤起失败(iOS 上没有安装, 或 scheme 被拦截)再给一次手动选项。 */
+   关键: 自定义 scheme 必须在"用户手势的同步调用栈"里发起,
+   否则 iOS 会当作非用户行为拦截 —— 所以不能用 iframe, 也不能包在
+   setTimeout 里, 必须直接赋值 location.href。 */
 function openInApp(songId){
   var scheme = 'orpheus://song/' + songId;
-  var t0 = Date.now();
 
-  // 通过隐藏 iframe 触发 scheme: 比直接跳转更温和,
-  // 不会把当前页导航走, 页面状态得以保留
-  var ifr = document.createElement('iframe');
-  ifr.style.cssText = 'display:none;width:0;height:0;border:0';
-  ifr.src = scheme;
-  document.body.appendChild(ifr);
-  setTimeout(function(){ try{ ifr.remove(); }catch(e){} }, 1200);
-
-  // 记录页面是否被切到后台: 被切说明 App 唤起成功
+  // 记录是否切到后台 (切走 = App 拉起成功)
   var wentBackground = false;
-  function onHide(){ if(document.hidden) wentBackground = true; }
-  document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', function(){ wentBackground = true; });
+  function markHidden(){ if(document.hidden) wentBackground = true; }
+  document.addEventListener('visibilitychange', markHidden);
 
+  // === 同步执行, 保留用户手势上下文 ===
+  try {
+    window.location.href = scheme;
+  } catch(e){}
+
+  // 页面可能被挂起; 若 1.8s 后仍在当前页, 说明没跳成功
   setTimeout(function(){
-    document.removeEventListener('visibilitychange', onHide);
-    // 页面还可见 => 大概率没唤起成功, 给个明确的手动入口
+    document.removeEventListener('visibilitychange', markHidden);
     if(!wentBackground && !document.hidden){
       showOpenFallback(songId);
     }
-  }, 1100);
+  }, 1800);
 }
 
 var _fbTimer = null;
